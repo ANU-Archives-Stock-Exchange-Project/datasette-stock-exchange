@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}{{ database }}{% if query and query.sql %}: {{ query.sql }}{% endif %}{% endblock %}
+
+{% block extra_head %}
+{{ super() }}
+{% if columns %}
+<style>
+@media only screen and (max-width: 576px) {
+{% for column in columns %}
+    .rows-and-columns td:nth-of-type({{ loop.index }}):before { content: "{{ column|escape_css_string }}"; }
+{% endfor %}
+}
+</style>
+{% endif %}
+{% include "_codemirror.html" %}
+{% endblock %}
+
+{% block body_class %}query db-{{ database|to_css_class }}{% if canned_query %} query-{{ canned_query|to_css_class }}{% endif %}{% endblock %}
+
+{% block nav %}
+    <ul>
+        <li><a href="{{ urls.instance() }}">home</a></li>
+        <li><a href="{{ urls.database(database) }}">{{ database }}</a></li>
+        <li><a href="{{ urls.table(database, 'stocks') }}">stocks</a></li>
+    </ul>
+    {{ super() }}
+{% endblock %}
+
+{% block content %}
+
+{% set pages = rows|groupby('page') %}
+
+{% if display_rows %}
+<h1 class="title is-3 mt-5" style="padding-left: 0.5rem; border-left: 0.5rem solid #{{ database_color(database) }}">{{ named_parameter_values.date }}</h2>
+<h3 class="subtitle is-5" style="padding-left: 1rem;">volume {{ display_rows.0.0 }}, {{ pages|length }} pages</h2>
+{% else %}
+<h1 class="title is-3 mt-5" style="padding-left: 0.5rem; border-left: 0.5rem solid #{{ database_color(database) }}">View pages by date</h1>
+{% endif %}
+
+{% block description_source_license %}{% include "_description_source_license.html" %}{% endblock %}
+
+<div class="columns">
+<div class="column is-half">
+<form class="sql" action="{{ urls.database(database) }}{% if canned_query %}/{{ canned_query }}{% endif %}" method="{% if canned_write %}post{% else %}get{% endif %}">
+    
+    {% if error %}
+        <p class="message-error">{{ error }}</p>
+    {% endif %}
+    {% if not hide_sql %}
+        {% if editable and allow_execute_sql %}
+            <p><textarea id="sql-editor" name="sql">{% if query and query.sql %}{{ query.sql }}{% else %}select * from {{ tables[0].name|escape_sqlite }}{% endif %}</textarea></p>
+        {% endif %}
+    {% else %}
+        {% if not canned_query %}
+            <input type="hidden" name="sql"
+                value="{% if query and query.sql %}{{ query.sql }}{% else %}select * from {{ tables[0].name|escape_sqlite }}{% endif %}"
+            >
+        {% endif %}
+    {% endif %}
+    {% if named_parameter_values %}
+        <h4 class="title is-5 mb-2">Go to date</h4>
+        <p class="is-size-7 has-text-gray">Select date between 1901 and 1950</p>
+        {% for name, value in named_parameter_values.items() %}
+            <div class="field is-grouped">
+                <div class="control"><input class="input" type="date" min="1901-01-01" max="1950-06-30" id="qp{{ loop.index }}" name="{{ name }}" value="{{ value }}"></div>
+                <div class="control"><input class="button is-link" type="submit" value="Go"></div>
+            </div>
+        {% endfor %}
+    {% endif %}
+    <p>
+        {% if canned_write %}<input type="hidden" name="csrftoken" value="{{ csrftoken() }}">{% endif %}
+        {{ show_hide_hidden }}
+    </p>
+</form>
+</div>
+</div>
+
+{% if display_rows %}
+<p class="export-links is-size-7 mb-2 mt-2">This data as {% for name, url in renderers.items() %}<a href="{{ url }}">{{ name }}</a>{{ ", " if not loop.last }}{% endfor %}, <a href="{{ url_csv }}">CSV</a></p>
+
+
+
+{% for page, page_cols in pages %}
+{% set first_col = page_cols|first %}
+
+<div class="columns mt-5">
+<div class="column is-3 pb-6">
+
+<h3 class="title is-5">Page {{ page }}</h3>
+
+<p>Session: {{ first_col.session }}</p>
+
+<p>Columns:</p>
+
+<ul style="list-style: disc outside none; padding-left: 30px">
+    {% for col in page_cols %}
+        <li style="padding: 5px;"><a href="/stock_exchange/column_search?vol={{ first_col.vol }}&page={{ page }}&col={{ col.col }}">column {{ col.col }} ({{ col.total_rows}} rows)</a></li>
+    {% endfor %}
+    
+</ul>
+
+</div>
+<div id="openseadragon{{loop.index}}" class="box column is-3">
+    <script src="/static/openseadragon.min.js"></script>
+    <script type="text/javascript">
+        var viewer = OpenSeadragon({
+            id: "openseadragon{{loop.index}}",
+            prefixUrl: "/static/images/",
+            visibilityRatio: 0.1,
+            tileSources: {
+                type: "image",
+                url: "https://cloudstor.aarnet.edu.au/plus/s/i02k4gxeEpMAUkm/download?path=AU+NBAC+N193-{{ '%03d' % display_rows.0.0 }}/N193-{{ '%03d' % display_rows.0.0 }}_{{ '%04d' % page }}.jpg"
+            }
+        });
+
+    </script>
+</div>
+</div>
+{% endfor %}
+
+
+
+{% else %}
+    {% if not canned_write and not error %}
+        <p class="zero-results">0 results</p>
+    {% endif %}
+{% endif %}
+
+{% include "_codemirror_foot.html" %}
+
+{% endblock %}

@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}{{ database }}{% if query and query.sql %}: {{ query.sql }}{% endif %}{% endblock %}
+
+{% block extra_head %}
+{{ super() }}
+{% if columns %}
+<style>
+@media only screen and (max-width: 576px) {
+{% for column in columns %}
+    .rows-and-columns td:nth-of-type({{ loop.index }}):before { content: "{{ column|escape_css_string }}"; }
+{% endfor %}
+}
+</style>
+{% endif %}
+{% include "_codemirror.html" %}
+{% endblock %}
+
+{% block body_class %}query db-{{ database|to_css_class }}{% if canned_query %} query-{{ canned_query|to_css_class }}{% endif %}{% endblock %}
+
+{% block nav %}
+    <ul>
+        <li><a href="{{ urls.instance() }}">home</a></li>
+        <li><a href="{{ urls.database(database) }}">{{ database }}</a></li>
+        <li><a href="{{ urls.table(database, 'stocks') }}">stocks</a></li>
+    </ul>
+    {{ super() }}
+{% endblock %}
+
+{% block content %}
+
+<h1 class="title" style="padding-left: 0.5rem; border-left: 0.5rem solid #{{ database_color(database) }}">{{ metadata.title or database }}{% if canned_query and not metadata.title %}: {{ canned_query }}{% endif %}{% if private %} 🔒{% endif %}</h1>
+
+{% block description_source_license %}{% include "_description_source_license.html" %}{% endblock %}
+
+<div class="columns">
+<div class="column">
+
+<form class="sql" action="{{ urls.database(database) }}{% if canned_query %}/{{ canned_query }}{% endif %}" method="{% if canned_write %}post{% else %}get{% endif %}">
+    
+    {% if error %}
+        <p class="message-error">{{ error }}</p>
+    {% endif %}
+    {% if not hide_sql %}
+        {% if editable and allow_execute_sql %}
+            <div class="field">
+                <div class="control">
+                    <textarea id="sql-editor" name="sql">{% if query and query.sql %}{{ query.sql }}{% else %}select * from {{ tables[0].name|escape_sqlite }}{% endif %}</textarea>
+                </div>
+            </div>
+        {% endif %}
+    {% else %}
+        {% if not canned_query %}
+            <input type="hidden" name="sql"
+                value="{% if query and query.sql %}{{ query.sql }}{% else %}select * from {{ tables[0].name|escape_sqlite }}{% endif %}"
+            >
+        {% endif %}
+    {% endif %}
+    {% if named_parameter_values %}
+    {% set vol = named_parameter_values.vol %}
+    {% set page = named_parameter_values.page %}
+    {% set col = named_parameter_values.col %}
+    {% set row = named_parameter_values.row %}
+    {% set top = named_parameter_values.top %}
+    {% set sub_rows = sql('select vol, page, col, row, sub_row, label_e, buyers_e, sellers_e, sales_e from stocks where vol = :vol and page = :page and col = :col and row = :row and sub_row > 0', {'vol': vol, 'page': page, 'col': col, 'row': row}) %}
+    {% set loop_offset = sub_rows|length %}
+    
+        <h3 class="title is-4">Parent row values</h3>
+        <div class="field">
+            <label class="label" for="label">label</label>
+            <div class="control"><textarea class="textarea" type="text" id="label" name="label" disabled>{{ request.args.label | replace('\xa0', '')}}</textarea></div>
+        </div>
+        <div class="field is-grouped">
+            <div class="control"><label class="label" for="buyers">buyers</label></div>
+            <div class="control"><input class="input" type="text" id="buyers" name="buyers" value="{{ request.args.buyers | replace('\xa0', '')}}" disabled></div> 
+            <div class="control"><label class="label" for="sellers">sellers</label></div>
+            <div class="control"><input class="input" type="text" id="sellers" name="sellers" value="{{ request.args.sellers | replace('\xa0', '')}}" disabled></div> 
+            <div class="control"><label class="label" for="sales">sales</label></div>
+            <div class="control"><input class="input" type="text" id="sales" name="sales" value="{{ request.args.sales | replace('\xa0', '')}}" disabled></div>
+        </div>
+        {% if sub_rows %}
+        <h3 class="title is-4 mt-4">Current sub rows</h3>
+            {% for sub in sub_rows %}
+            <div class="field">
+                <label class="label" for="label">label</label>
+                <div class="control"><input class="input" type="text" id="label" name="label" value="{{ sub.label_e | replace('\xa0', '')}}" disabled></div>
+            </div>
+            <div class="field is-grouped">
+                <div class="control"><label class="label" for="buyers">buyers</label></div>
+                <div class="control"><input class="input" type="text" id="buyers" name="buyers" value="{{ sub.buyers_e | replace('\xa0', '')}}" disabled></div> 
+                <div class="control"><label class="label" for="sellers">sellers</label></div>
+                <div class="control"><input class="input" type="text" id="sellers" name="sellers" value="{{ sub.sellers_e | replace('\xa0', '')}}" disabled></div> 
+                <div class="control"><label class="label" for="sales">sales</label></div>
+                <div class="control"><input class="input" type="text" id="sales" name="sales" value="{{ sub.sales_e | replace('\xa0', '')}}" disabled></div>
+            </div>
+            {% endfor %}
+        {% endif %}
+        
+        <h3 class="title is-4 mt-4">New sub row</h3>
+
+        {% for k, v in named_parameter_values.items() %}
+            {% if k in ['date', 'session', 'vol', 'page', 'col', 'row', 'top', 'sub_row'] %}
+                <input type="hidden" name="{{k}}" value="{{v}}">
+            {% endif %}
+        {% endfor %}
+        <div class="field">
+            <label class="label" for="label">label</label>
+            <div class="control"><input class="input" type="text" id="label_e" name="label_e" value="{{ named_parameter_values.label_e | replace('\xa0', '')}}"></div>
+        </div>
+        <div class="field is-grouped">
+            <div class="control"><label class="label" for="buyers_e">buyers</label></div>
+            <div class="control"><input class="input" type="text" id="buyers_e" name="buyers_e" value="{{ named_parameter_values.buyers_e | replace('\xa0', '')}}"></div> 
+            <div class="control"><label class="label" for="sellers_e">sellers</label></div>
+            <div class="control"><input class="input" type="text" id="sellers_e" name="sellers_e" value="{{ named_parameter_values.sellers_e | replace('\xa0', '')}}"></div> 
+            <div class="control"><label class="label" for="sales_e">sales</label></div>
+            <div class="control"><input class="input" type="text" id="sales_e" name="sales_e" value="{{ named_parameter_values.sales_e | replace('\xa0', '')}}"></div>
+        </div>
+        {{ actor.id }}
+
+        {% if actor.id %}
+            {% set user = actor['id'] %}
+        {% else %}
+            {% set user = actor['gh_id'] %}
+        {% endif %}
+        <input type="hidden" name="user" value="{{ user }}">
+    {% endif %}
+    {% if canned_write %}<input type="hidden" name="csrftoken" value="{{ csrftoken() }}">{% endif %}
+    
+    <div class="field"><div class="control"><input class="button is-link" type="submit" value="Add row"></div></div>
+        <p>
+        {{ show_hide_hidden }}
+        </p>
+</form>
+</div>
+<div id="openseadragon1" class="column">
+    <script src="/static/openseadragon.min.js"></script>
+    <script type="text/javascript">
+        var viewer = OpenSeadragon({
+            id: "openseadragon1",
+            prefixUrl: "/static/images/",
+            visibilityRatio: 0.1,
+            tileSources: {
+                type: "image",
+                url: "https://cloudstor.aarnet.edu.au/plus/s/9XN0h9ro6RB3o7D/download?path=AU+NBAC+N193-{{ '%03d' % (vol|int) }}/columns/N193-{{ '%03d' % (vol|int) }}_{{ '%04d' % (page|int) }}-col-{{ col }}.jpg"
+            }
+        });
+        // Position image at top of viewer
+        viewer.addHandler('open', function()
+        {
+            var tiledImage = viewer.world.getItemAt(0);
+            var top = {{ request.args.top }} * tiledImage.source.dimensions.y;
+            var coords = tiledImage.imageToViewportCoordinates(0, top);
+            var oldBounds = viewer.viewport.getBounds();
+            //console.log(oldBounds);
+            var newBounds = new OpenSeadragon.Rect(0, coords.y, 1, oldBounds.height / oldBounds.width);
+            //console.log(newBounds);
+            viewer.viewport.fitBounds(newBounds, true);
+            //viewer.viewport.fitBounds(viewportRect, false);
+            console.log(viewer.viewport.getBounds());
+        });
+    </script>
+</div>
+
+
+</div>
+
+{% include "_codemirror_foot.html" %}
+
+{% endblock %}

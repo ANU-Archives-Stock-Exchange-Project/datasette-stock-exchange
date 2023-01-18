@@ -1,0 +1,82 @@
+{
+    "title": "Sydney Stock Exchange Stock and Share Lists, 1901 to 1950",
+    "description_html": "This data has been generated from the digitised <a href='http://archivescollection.anu.edu.au/index.php/or59j'>Sydney Stock Exchange Stock and Share Lists</a> held by ANU Archives. The printed stock names and handwritten share prices were extracted using Amozon Textract. The table rows were reconstructed using positional information in the Textract data. Neither of these processes were perfect and many errors remain. These problems will be addressed over time. For more information see the <a href='https://glam-workbench.net/anu-archives/'>ANU Archives section</a> of the GLAM Workbench.",
+    "extra_css_urls": [
+        "/static/style.css"
+    ],
+    "plugins": {
+        "datasette-auth-github": {
+            "client_id": {"$env": "GITHUB_CLIENT_ID"},
+            "client_secret": {"$env": "GITHUB_CLIENT_SECRET"},
+            "load_orgs": ["ANU-Archives-Stock-Exchange-Project"]
+        }
+    },
+    "databases": {
+        "stock_exchange": {
+            "title": "Sydney Stock Exchange Stock and Share Lists, 1901 to 1950",
+            "tables": {
+                "stocks": {
+                    "title": "Current prices",
+                    "searchmode": "raw"
+                }
+            },
+            "queries": {
+                "column_search": {
+                    "sql": "select * from stocks\n where vol = :vol and page = :page and col = :col order by row",
+                    "title": "Column view"
+                },
+                "date_search": {
+                    "sql": "select vol, page, col, count(row) as total_rows, date, session\n from stocks\n where date = :date group by page, col order by date, page, col",
+                    "title": "Date summary",
+                    "hide_sql": true
+                },
+                "stock_edit": {
+                    "sql": "UPDATE stocks SET label_e=:label_e, buyers_e=:buyers_e, sellers_e=:sellers_e, sales_e=:sales_e, user_e=:user, edit_date=:_now_datetime_utc WHERE (vol, page, col, row, sub_row)=(:vol, :page, :col, :row, :sub_row)",
+                    "title": "Update row",
+                    "write": true,
+                    "allow": {
+                        "id": ["root"],
+                        "gh_id": ["127565"],
+                        "gh_orgs": ["ANU-Archives-Stock-Exchange-Project"]
+                    },
+                    "on_success_message": "Row updated",
+                    "on_success_redirect": "/stock_exchange/user_edits",
+                    "on_error_message": "There was an error"
+                },
+                "stock_add": {
+                    "sql": "INSERT INTO stocks (date, session, vol, page, col, row, sub_row, top, label_e, buyers_e, sellers_e, sales_e, user_e, edit_date) VALUES (:date, :session, :vol, :page, :col, :row, :sub_row, :top, :label_e, :buyers_e, :sellers_e, :sales_e, :user, :_now_datetime_utc)",
+                    "title": "Insert row",
+                    "write": true,
+                    "allow": {
+                        "id": ["root"],
+                        "gh_id": ["127565"],
+                        "gh_orgs": ["ANU-Archives-Stock-Exchange-Project"]
+                    },
+                    "on_success_message": "Row inserted",
+                    "on_success_redirect": "/stock_exchange/user_edits"
+                },
+                "stock_delete": {
+                    "sql": "DELETE FROM stocks WHERE (vol, page, col, row, sub_row)=(:vol, :page, :col, :row, :sub_row)",
+                    "title": "Delete row",
+                    "write": true,
+                    "allow": {
+                        "id": ["root"],
+                        "gh_id": ["127565"],
+                        "gh_orgs": ["ANU-Archives-Stock-Exchange-Project"]
+                    },
+                    "on_success_message": "Row deleted",
+                    "on_success_redirect": "/stock_exchange/user_edits"
+                },
+                "user_edits": {
+                    "sql": "select * from stocks\n where user_e = :_actor_gh_id order by edit_date DESC",
+                    "title": "User edits",
+                    "allow": {
+                        "id": ["root"],
+                        "gh_id": ["127565"],
+                        "gh_orgs": ["ANU-Archives-Stock-Exchange-Project"]
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,5 @@
+{
+    "sql_time_limit_ms": 30000,
+    "facet_time_limit_ms": 30000,
+    "suggest_facets": "off"
+}

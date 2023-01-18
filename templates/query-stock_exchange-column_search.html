@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}{{ database }}{% if query and query.sql %}: {{ query.sql }}{% endif %}{% endblock %}
+
+{% block extra_head %}
+{{ super() }}
+{% if columns %}
+<style>
+@media only screen and (max-width: 576px) {
+{% for column in columns %}
+    .rows-and-columns td:nth-of-type({{ loop.index }}):before { content: "{{ column|escape_css_string }}"; }
+{% endfor %}
+}
+</style>
+{% endif %}
+{% include "_codemirror.html" %}
+{% endblock %}
+
+{% block body_class %}query db-{{ database|to_css_class }}{% if canned_query %} query-{{ canned_query|to_css_class }}{% endif %}{% endblock %}
+
+{% block nav %}
+    <ul>
+        <li><a href="{{ urls.instance() }}">home</a></li>
+        <li><a href="{{ urls.database(database) }}">{{ database }}</a></li>
+        <li><a href="{{ urls.table(database, 'stocks') }}">stocks</a></li>
+    </ul>
+    {{ super() }}
+{% endblock %}
+
+{% block content %}
+{% set vol = named_parameter_values.vol | int %}
+{% set page = named_parameter_values.page | int %}
+{% set col = named_parameter_values.col | int %}
+
+{% if display_rows %}
+<h1 class="title is-3 mt-5" style="padding-left: 10px; border-left: 10px solid #{{ database_color(database) }}">Volume {{ vol }}, page {{ page }}, column {{ col }}</h1>
+<h3 class="subtitle is-5" style="padding-left: 1rem;">{{ rows.0.date }}, session {{ rows.0.session }}, {{ display_rows|length }} rows</h3>
+{% else %}
+<h1 class="title is-3 mt-5" style="padding-left: 0.5rem; border-left: 0.5rem solid #{{ database_color(database) }}">View a column</h1>
+{% endif %}
+
+{% block description_source_license %}{% include "_description_source_license.html" %}{% endblock %}
+
+<div class="columns mb-4">
+<div class="column is-half">
+<form class="sql" action="{{ urls.database(database) }}{% if canned_query %}/{{ canned_query }}{% endif %}" method="{% if canned_write %}post{% else %}get{% endif %}">
+
+    {% if error %}
+        <p class="message-error">{{ error }}</p>
+    {% endif %}
+    {% if not hide_sql %}
+        {% if editable and allow_execute_sql %}
+        <div class="field">
+            <div class="control"><textarea id="sql-editor" name="sql">{% if query and query.sql %}{{ query.sql }}{% else %}select * from {{ tables[0].name|escape_sqlite }}{% endif %}</textarea></div>
+        </div>
+        {% endif %}
+    {% else %}
+        {% if not canned_query %}
+        <div class="field">
+            <div class="control"><input type="hidden" name="sql"
+                value="{% if query and query.sql %}{{ query.sql }}{% else %}select * from {{ tables[0].name|escape_sqlite }}{% endif %}"
+            ></div>
+        </div>
+        {% endif %}
+    {% endif %}
+    {% if named_parameter_values %}
+        <h4 class="title is-5 mb-2">Go to column</h3>
+        <div class="field is-grouped">
+            {% for name, value in named_parameter_values.items() %}        
+                <div class="control"><label class="label" for="qp{{ loop.index }}">{{ name }}</label></div><div class="control"><input class="input is-small" type="text" id="qp{{ loop.index }}" name="{{ name }}" value="{{ value }}"></div>
+            {% endfor %}
+            {% if canned_write %}<input type="hidden" name="csrftoken" value="{{ csrftoken() }}">{% endif %}
+            <div class="control"><input class="button is-small is-link" type="submit" value="Go"></div>
+            {{ show_hide_hidden }}
+        </div>
+    {% endif %}
+        
+</form>
+</div>
+</div>
+
+{% if display_rows %}
+<p class="export-links is-size-7">This data as {% for name, url in renderers.items() %}<a href="{{ url }}">{{ name }}</a>{{ ", " if not loop.last }}{% endfor %}, <a href="{{ url_csv }}">CSV</a></p>
+
+{% set vol = named_parameter_values.vol | int %}
+{% set page = named_parameter_values.page | int %}
+{% set col = named_parameter_values.col | int %}
+
+<a class="button is-link mt-5 mb-5" href="/stock_exchange/date_search?date={{ rows.0.date }}">All pages from {{ rows.0.date }}</a>
+
+
+<div class="table-wrapper table-container">
+
+<div class="columns">
+<div class="column is-narrow">
+<table class="table is-bordered is-striped is-hoverable rows-and-columns">
+    <thead>
+        <tr>
+            <th>Link</th>
+            {% for column in columns %}
+                {% if column not in ['vol', 'page', 'col', 'top', 'edit_date', 'date', 'session', 'annotated', 'row', 'sub_row'] and '_e' not in column %}
+                    <th class="col-{{ column|to_css_class }}" scope="col">{{ column }}</th>
+            <!--
+                {% if column not in ['vol', 'page', 'col', 'top', 'edit_date'] %}
+                    {% if column[-2:] != '_e' %}<th class="col-{{ column|to_css_class }}" scope="col">{{ column }}</th>{% endif %}
+                {% endif %}
+            -->
+                {% endif %}
+            {% endfor %}
+            {% if actor != None and 'ANU-Archives-Stock-Exchange-Project' in actor.gh_orgs or actor.id == 'root' %}
+            <th>&nbsp;</th>
+            <th>&nbsp;</th>
+            {% endif %}
+        </tr>
+    </thead>
+    <tbody>
+    {% for values in display_rows %}
+        {% set row = dict(zip(columns, values)) %}
+        {% if row.sub_row == 0 %}
+            {% set rowspan = 2 %}
+        {% else %}
+        {% set rowspan = 1 %}
+        {% endif %}
+        <tr {% if row.sub_row > 0 %}class="updated"{% endif %}>
+            <td rowspan="{{rowspan}}"><a href="/stock_exchange/stocks/{{ vol }},{{ page }},{{ col }},{{ row.row }},{{ row.sub_row }}">{{ vol }},{{ page }},{{ col }},{{ row.row }},{{ row.sub_row }}</a></td>
+            {% if row.sub_row == 0 %}
+                {% for column, td in row.items() %}
+                    {% if column not in ['vol', 'page', 'col', 'top', 'edit_date', 'date', 'session', 'annotated', 'row', 'sub_row']%}
+
+                        {% if column + '_e' in row %}
+                            <td class="col-{{ column|to_css_class }}">{{ td }}</td>
+                        {% elif '_e' not in column %}
+                            <td class="col-{{ column|to_css_class }}" rowspan="2">{{ td }}</td>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                {% for column, td in row.items() %}
+                    {% if '_e' in column and column != 'user_e' %}
+                        {% if td.strip() != '' and td != '&nbsp;' %}
+                            <td class="col-{{ column|to_css_class }} updated">{{ td }}</td>
+                        {% else %}
+                            <td class="col-{{ column|to_css_class }}">{{ td }}</td>
+                        {% endif %}
+                        
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            {% if actor != None and 'ANU-Archives-Stock-Exchange-Project' in actor.gh_orgs or actor.id == 'root' %}
+                {% set last_sub_row = display_rows|selectattr(14, 'eq', row['row'])|list|last %}
+                {% set next_sub_row = last_sub_row.15 + 1 %}
+                <td rowspan="{{rowspan}}"><a href="/stock_exchange/stock_edit?vol={{vol}}&page={{page}}&col={{col}}&row={{row['row']}}&sub_row={{row['sub_row']}}&label={{row['label']|d('', true)}}&buyers={{row['buyers']|d('', true)}}&sellers={{row['sellers']|d('', true)}}&sales={{row['sales']|d('', true)}}&label_e={{row['label_e']|d('', true)}}&buyers_e={{row['buyers_e']|d('', true)}}&sellers_e={{row['sellers_e']|d('', true)}}&sales_e={{row['sales_e']|d('', true)}}&top={{row['top']}}"><button class="button is-small is-light"><span class="icon is-small"><svg style="width:24px;height:24px" viewBox="0 0 24 24"><path fill="currentColor" d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"></svg></span></button></a></td>
+                {% if row['sub_row'] == 0 %}<td rowspan="{{rowspan}}"><a href="/stock_exchange/stock_add?date={{row.date}}&session={{row.session}}&vol={{vol}}&page={{page}}&col={{col}}&row={{row['row']}}&sub_row={{ next_sub_row }}&label={{row['label']}}&buyers={{row['buyers']}}&sellers={{row['sellers']}}&sales={{row['sales']}}&label_e={{row['label_e']}}&buyers_e={{row['buyers_e']}}&sellers_e={{row['sellers_e']}}&sales_e={{row['sales_e']}}&top={{row['top']}}"><button class="button is-small is-light"><span class="icon is-small"><svg style="width:24px;height:24px" viewBox="0 0 24 24"><path fill="currentColor" d="M20 14H14V20H10V14H4V10H10V4H14V10H20V14Z" /></svg></span></button></a></td>{% else %}<td rowspan="{{rowspan}}">&nbsp;</td>{% endif %}
+            {% endif %}
+        </tr>
+        {% if row.sub_row == 0 %}
+            <tr>
+                {% for column, td in row.items() %}
+                    {% if '_e' in column and column != 'user_e' %}
+                        {% if td.strip() != '' and td != '&nbsp;' %}
+                            <td class="col-{{ column|to_css_class }} updated">{{ td }}</td>
+                        {% else %}
+                            <td class="col-{{ column|to_css_class }}">{{ td }}</td>
+                        {% endif %}
+                        
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        {% endif %}
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+<div id="openseadragon1" class="column box">
+        <script src="/static/openseadragon.min.js"></script>
+        <script type="text/javascript">
+            var viewer = OpenSeadragon({
+                id: "openseadragon1",
+                prefixUrl: "/static/images/",
+                visibilityRatio: 0.1,
+                tileSources: {
+                    type: "image",
+                    url: "https://cloudstor.aarnet.edu.au/plus/s/9XN0h9ro6RB3o7D/download?path=AU+NBAC+N193-{{ '%03d' % vol }}/columns/N193-{{ '%03d' % vol }}_{{ '%04d' % page }}-col-{{ col }}.jpg"
+                }
+            });
+            // Position image at top of viewer
+            viewer.addHandler('open', function()
+            {
+                var oldBounds = viewer.viewport.getBounds();
+                //console.log(oldBounds);
+                var newBounds = new OpenSeadragon.Rect(0, 0, 1, oldBounds.height / oldBounds.width);
+                //console.log(newBounds);
+                viewer.viewport.fitBounds(newBounds, true);
+                //viewer.viewport.fitBounds(viewportRect, false);
+            });
+            addEventListener('resize', function()
+            {
+                var oldBounds = viewer.viewport.getBounds();
+                //console.log(oldBounds);
+                var newBounds = new OpenSeadragon.Rect(0, 0, 1, oldBounds.height / oldBounds.width);
+                //console.log(newBounds);
+                viewer.viewport.fitBounds(newBounds, true);
+                //viewer.viewport.fitBounds(viewportRect, false);
+            });
+        </script>
+</div>
+</div>
+</div>
+{% else %}
+    {% if not canned_write and not error %}
+        <p class="zero-results">0 results</p>
+    {% endif %}
+{% endif %}
+
+{% include "_codemirror_foot.html" %}
+
+{% endblock %}

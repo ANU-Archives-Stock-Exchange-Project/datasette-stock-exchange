@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}{{ database }}{% if query and query.sql %}: {{ query.sql }}{% endif %}{% endblock %}
+
+{% block extra_head %}
+{{ super() }}
+{% if columns %}
+<style>
+@media only screen and (max-width: 576px) {
+{% for column in columns %}
+    .rows-and-columns td:nth-of-type({{ loop.index }}):before { content: "{{ column|escape_css_string }}"; }
+{% endfor %}
+}
+</style>
+{% endif %}
+{% include "_codemirror.html" %}
+{% endblock %}
+
+{% block body_class %}query db-{{ database|to_css_class }}{% if canned_query %} query-{{ canned_query|to_css_class }}{% endif %}{% endblock %}
+
+{% block nav %}
+    <ul>
+        <li><a href="{{ urls.instance() }}">home</a></li>
+        <li><a href="{{ urls.database(database) }}">{{ database }}</a></li>
+        <li><a href="{{ urls.table(database, 'stocks') }}">stocks</a></li>
+    </ul>
+    {{ super() }}
+{% endblock %}
+
+{% block content %}
+
+<h1 class="title" style="padding-left: 0.5rem; border-left: 0.5rem solid #{{ database_color(database) }}">{{ metadata.title or database }}{% if canned_query and not metadata.title %}: {{ canned_query }}{% endif %}{% if private %} 🔒{% endif %}</h1>
+
+{% block description_source_license %}{% include "_description_source_license.html" %}{% endblock %}
+
+<div class="columns">
+<div class="column">
+<form class="sql" action="{{ urls.database(database) }}{% if canned_query %}/{{ canned_query }}{% endif %}" method="{% if canned_write %}post{% else %}get{% endif %}">
+    
+    {% if error %}
+        <p class="message-error">{{ error }}</p>
+    {% endif %}
+    {% if not hide_sql %}
+        {% if editable and allow_execute_sql %}
+            <p><textarea id="sql-editor" name="sql">{% if query and query.sql %}{{ query.sql }}{% else %}select * from {{ tables[0].name|escape_sqlite }}{% endif %}</textarea></p>
+        {% endif %}
+    {% else %}
+        {% if not canned_query %}
+            <input type="hidden" name="sql"
+                value="{% if query and query.sql %}{{ query.sql }}{% else %}select * from {{ tables[0].name|escape_sqlite }}{% endif %}"
+            >
+        {% endif %}
+    {% endif %}
+    {% if named_parameter_values %}
+    <div class="field">
+        <label class="label" for="label">label</label>
+        <div class="control"><input class="input" type="text" id="label" name="label" value="{{ request.args.label|replace('\xa0', '') }}" disabled></div>
+    </div>
+    <div class="field">   
+        <div class="control"><input class="input" type="text" placeholder="Enter new value" id="label" name="label_e" value="{{ named_parameter_values['label_e']|replace('\xa0', '') }}"></div>
+    </div>
+    <div class="field">
+        <label class="label" for="buyers">buyers</label>
+        <div class="control"><input class="input" type="text" id="buyers" name="buyers" value="{{ request.args.buyers|replace('\xa0', '') }}" disabled></div>
+    </div>
+    <div class="field">   
+        <div class="control"><input class="input" type="text" placeholder="Enter new value" id="buyers_e" name="buyers_e" value="{{ named_parameter_values['buyers_e']|replace('\xa0', '') }}"></div>
+    </div>
+    <div class="field">
+        <label class="label" for="sellers">sellers</label>
+        <div class="control"><input class="input" type="text" id="sellers" name="sellers" value="{{ request.args.sellers|replace('\xa0', '') }}" disabled></div>
+    </div>
+    <div class="field">   
+        <div class="control"><input class="input" type="text" placeholder="Enter new value" id="sellers_e" name="sellers_e" value="{{ named_parameter_values['sellers_e']|replace('\xa0', '') }}"></div>
+    </div>
+    <div class="field">
+        <label class="label" for="sales">sales</label>
+        <div class="control"><input class="input" type="text" id="sales" name="sales" value="{{ request.args.sales|replace('\xa0', '') }}" disabled></div>
+    </div>
+    <div class="field">   
+        <div class="control"><input class="input" type="text" placeholder="Enter new value" id="sales_e" name="sales_e" value="{{ named_parameter_values['sales_e']|replace('\xa0', '') }}"></div>
+    </div>
+        {% for name, value in named_parameter_values.items() %}
+            {% if name in ["vol", "page", "col", "row", "sub_row"] %}
+            <input type="hidden" name="{{ name }}" value="{{ value }}">
+            {% endif %}
+        {% endfor %}
+        {% if 'id' in actor %}
+            {% set user = actor['id'] %}
+        {% else %}
+            {% set user = actor['gh_id'] %}
+        {% endif %}
+        <input type="hidden" id="user" name="user" value="{{ user }}">
+    {% endif %}
+    {% if canned_write %}<input type="hidden" name="csrftoken" value="{{ csrftoken() }}">{% endif %}
+    {{ show_hide_hidden }}
+    <div class="field is-grouped">
+        <div class="control"><input class="button is-link" type="submit" value="Save changes"></div>
+        {% if named_parameter_values.sub_row|int > 0 %}
+            <div class="control">
+                <a class="button is-danger" href="/stock_exchange/stock_delete?vol={{named_parameter_values.vol}}&page={{named_parameter_values.page}}&col={{named_parameter_values.col}}&row={{named_parameter_values.row}}&sub_row={{named_parameter_values.sub_row}}">Delete this record</a>
+            </div>
+        {% endif %}
+    </div>
+</form>
+</div>
+<div id="openseadragon1" class="column">
+    <script src="/static/openseadragon.min.js"></script>
+    <script type="text/javascript">
+        var viewer = OpenSeadragon({
+            id: "openseadragon1",
+            prefixUrl: "/static/images/",
+            visibilityRatio: 0.1,
+            tileSources: {
+                type: "image",
+                url: "https://cloudstor.aarnet.edu.au/plus/s/9XN0h9ro6RB3o7D/download?path=AU+NBAC+N193-{{ '%03d' % (named_parameter_values['vol']|int) }}/columns/N193-{{ '%03d' % (named_parameter_values['vol']|int) }}_{{ '%04d' % (named_parameter_values['page']|int) }}-col-{{ named_parameter_values['col'] }}.jpg"
+            }
+        });
+        // Position image at top of viewer
+        viewer.addHandler('open', function()
+        {
+            var tiledImage = viewer.world.getItemAt(0);
+            var top = {{ request.args.top }} * tiledImage.source.dimensions.y;
+            var coords = tiledImage.imageToViewportCoordinates(0, top);
+            var oldBounds = viewer.viewport.getBounds();
+            //console.log(oldBounds);
+            var newBounds = new OpenSeadragon.Rect(0, coords.y, 1, oldBounds.height / oldBounds.width);
+            //console.log(newBounds);
+            viewer.viewport.fitBounds(newBounds, true);
+            //viewer.viewport.fitBounds(viewportRect, false);
+            console.log(viewer.viewport.getBounds());
+        });
+    </script>
+</div>
+
+
+</div>
+
+
+{% include "_codemirror_foot.html" %}
+
+{% endblock %}

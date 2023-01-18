@@ -1,0 +1,53 @@
+{% if display_rows %}
+<div class="table-wrapper table-container">
+    <table class="table is-fullwidth is-narrow is-bordered is-striped is-hoverable rows-and-columns">
+        <thead>
+            <tr>
+                {% for column in display_columns %}
+                    {% if column.name not in ['top'] %}
+                        {% if loop.index == 12 and (actor != None and 'ANU-Archives-Stock-Exchange-Project' in actor.gh_orgs or actor.id == 'root') %}
+                            <td>&nbsp;</td>
+                        {% endif%}
+                        <th {% if column.description %}data-column-description="{{ column.description }}" {% endif %}class="col-{{ column.name|to_css_class }}" scope="col" data-column="{{ column.name }}" data-column-type="{{ column.type }}" data-column-not-null="{{ column.notnull }}" data-is-pk="{% if column.is_pk %}1{% else %}0{% endif %}">
+                            {% if not column.sortable %}
+                                {{ column.name }}
+                            {% else %}
+                                {% if column.name == sort %}
+                                    <a href="{{ path_with_replaced_args(request, {'_sort_desc': column.name, '_sort': None, '_next': None}) }}" rel="nofollow">{{ column.name }}&nbsp;▼</a>
+                                {% else %}
+                                    <a href="{{ path_with_replaced_args(request, {'_sort': column.name, '_sort_desc': None, '_next': None}) }}" rel="nofollow">{{ column.name }}{% if column.name == sort_desc %}&nbsp;▲{% endif %}</a>
+                                {% endif %}
+                            {% endif %}
+                        </th>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+        {% for row in display_rows %}
+            {% set sub_row = row.sub_row|int %}
+            <tr {% if sub_row > 0 %}class="updated"{% endif %}>
+                {% for cell in row %}
+                    {% if cell.column not in ['top'] %}
+                        {% if cell.column == 'col' %}
+                            <td class="col-{{ cell.column|to_css_class }}"><a href="/stock_exchange/column_search?vol={{ row.vol }}&page={{ row.page }}&col={{ cell.value }}">{{ cell.value }}</a></td>
+                        {% elif cell.column == 'date' %}
+                            <td class="col-{{ cell.column|to_css_class }}"><a href="/stock_exchange/date_search?date={{ cell.value }}">{{ cell.value }}</a></td>
+                        {% elif cell.column[-2:] == '_e' and cell.value.strip() != '' and cell.value != '&nbsp;' %}
+                            <td class="col-{{ cell.column|to_css_class }} updated">{{ cell.value}}</td>
+                        {% else %}
+                            {% if loop.index == 12 and (actor != None and 'ANU-Archives-Stock-Exchange-Project' in actor.gh_orgs or actor.id == 'root') %}
+                                <td><a href="/stock_exchange/stock_edit?vol={{row.vol}}&page={{row.page}}&col={{row.col}}&row={{row.row}}&sub_row={{row.sub_row}}&label={{row.label|d('', true)}}&buyers={{row.buyers|d('', true)}}&sellers={{row.sellers|d('', true)}}&sales={{row.sales|d('', true)}}&label_e={{row.label_e|d('', true)}}&buyers_e={{row.buyers_e|d('', true)}}&sellers_e={{row.sellers_e|d('', true)}}&sales_e={{row.sales_e|d('', true)}}&top={{row.top}}"><button class="button is-small is-light"><span class="icon is-small"><svg style="width:24px;height:24px" viewBox="0 0 24 24"><path fill="currentColor" d="M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z"></svg></span></button></a></td>
+                            {% endif %}
+                            <td class="col-{{ cell.column|to_css_class }}">{{ cell.value}}</td>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+    <p class="zero-results">0 records</p>
+{% endif %}

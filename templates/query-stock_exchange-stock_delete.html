@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ database }}{% if query and query.sql %}: {{ query.sql }}{% endif %}{% endblock %}
+
+{% block extra_head %}
+{{ super() }}
+{% if columns %}
+<style>
+@media only screen and (max-width: 576px) {
+{% for column in columns %}
+    .rows-and-columns td:nth-of-type({{ loop.index }}):before { content: "{{ column|escape_css_string }}"; }
+{% endfor %}
+}
+</style>
+{% endif %}
+{% include "_codemirror.html" %}
+{% endblock %}
+
+{% block body_class %}query db-{{ database|to_css_class }}{% if canned_query %} query-{{ canned_query|to_css_class }}{% endif %}{% endblock %}
+
+{% block nav %}
+    <ul>
+        <li><a href="{{ urls.instance() }}">home</a></li>
+        <li><a href="{{ urls.database(database) }}">{{ database }}</a></li>
+        <li><a href="{{ urls.table(database, 'stocks') }}">stocks</a></li>
+    </ul>
+    {{ super() }}
+{% endblock %}
+
+{% block content %}
+
+<h1 class="title" style="padding-left: 10px; border-left: 10px solid #{{ database_color(database) }}">{{ metadata.title or database }}{% if canned_query and not metadata.title %}: {{ canned_query }}{% endif %}{% if private %} 🔒{% endif %}</h1>
+
+{% if named_parameter_values.sub_row|int > 0 %}
+
+<form class="sql mb-4" action="{{ urls.database(database) }}{% if canned_query %}/{{ canned_query }}{% endif %}" method="{% if canned_write %}post{% else %}get{% endif %}">
+    {% if error %}
+        <p class="message-error">{{ error }}</p>
+    {% endif %}
+    {% if named_parameter_values %}
+        <h3 class="title is-4">Are you sure you want to delete this record?</h3>
+        <div class="field is-grouped">
+        {% for name, value in named_parameter_values.items() %}
+            <div class="control"><label class="label" for="qp{{ loop.index }}">{{ name }}</label></div>
+            <div class="control"><input class="input" type="text" id="qp{{ loop.index }}" name="{{ name }}" value="{{ value }}" readonly></div>
+        {% endfor %}
+        </div>
+    
+    <div class="field is-grouped">
+        {% if canned_write %}<input type="hidden" name="csrftoken" value="{{ csrftoken() }}">{% endif %}
+        <div class="control"><a class="button is-link" href="/stock_exchange/stocks/{{named_parameter_values.vol}},{{named_parameter_values.page}},{{named_parameter_values.col}},{{named_parameter_values.row}},{{named_parameter_values.sub_row}}">Return to record</a></div>
+        <div class="control"><input class="button is-danger" type="submit" value="Delete record"></div>
+        {{ show_hide_hidden }}
+    </div>
+    {% endif %}
+</form>
+
+{% else %}
+
+You can't delete this row.
+
+{% endif %}
+
+{% include "_codemirror_foot.html" %}
+
+{% endblock %}

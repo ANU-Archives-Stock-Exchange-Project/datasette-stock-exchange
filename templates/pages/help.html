@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="columns is-desktop">
+    <div class="column is-half">
+
+        <h1 class="title is-3">Help</h1>
+
+
+
+        <h2 class="title is-4">Making corrections</h2>
+
+        <p class="content">Authorised users can help improve the dataset by correcting the transcribed text. </p>
+
+        <h3 class="title is-5">Authorisation</h3>
+        <div class="content">
+        <p>Authorisation is via GitHub. To become an authorised user, you have to be added as a member of the <a href="https://github.com/ANU-Archives-Stock-Exchange-Project">ANU Stock Exchange Project</a>:</p>
+        <ul>
+        <li>Create a GitHub account (if you don’t have one)</li>
+        <li>Contact ??? with your GitHub details and ask to be added to the project</li>
+        <li>Go to the database and click on the ‘Sign in with GitHub’ link at the top right.</li>
+        <li>Follow the prompts to authorise your account.</li>
+        </ul>
+        </div>
+
+        <h3 class="title is-5">Editing a row</h3>
+
+
+
+        <h3 class="title is-5">Splitting a row</h3>
+        <div class="content">
+        <p>Sometimes multiple rows are transcribed as a single block of text. To split the text into individual rows, you can add new rows and divide the content between them. New rows are added as 'sub rows' connected to their parent row. To split a row:</p>
+
+        <ul>
+        <li>Go to the row you want to split by clicking on the link in the search results</li>
+        <li>Click on the <b>View full column</b> button</li>
+        <li>If you're logged in, you should see <button class="button is-small is-light"><span class="icon is-small"><svg style="width:24px;height:24px" viewBox="0 0 24 24"><path fill="currentColor" d="M20 14H14V20H10V14H4V10H10V4H14V10H20V14Z" /></svg></span></button> buttons at the end of each row</li>
+        <li>Click on the <button class="button is-small is-light"><span class="icon is-small"><svg style="width:24px;height:24px" viewBox="0 0 24 24"><path fill="currentColor" d="M20 14H14V20H10V14H4V10H10V4H14V10H20V14Z" /></svg></span></button> button at the end of the row you want to split</li>
+        <li>The add row form displays the contents of the parent row and any existing sub rows. Enter the contents of the new sub row in the text boxes and click <b>Add row</b></li>
+        </ul>
+
+        <p>Repeat this process until the contents of the parent row has been split between the sub rows. At this point you can edit the parent row to remove the duplicate content.</p>
+
+
+
+        </ul>
+
+
+        </div>
+
+    </div>
+</div>
+
+
+
+{% endblock %}
